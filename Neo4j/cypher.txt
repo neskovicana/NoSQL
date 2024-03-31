@@ -1,0 +1,53 @@
+LOAD CSV WITH HEADERS FROM 'file:///Person.csv' AS row
+MERGE (p:Person {name: coalesce(row.name, 'Unknown')})
+SET p.birthdate = row.birthdate,
+    p.birth_name = coalesce(row.birth_name, ''),
+    p.birth_place = coalesce(row.birth_place, ''),
+    p.birth_region = coalesce(row.birth_region, ''),
+    p.birth_country = coalesce(row.birth_country, ''),
+    p.height_meters = toFloat(coalesce(row.height_meters, '0')),
+    p.nickname = coalesce(row.nickname, '');
+
+LOAD CSV WITH HEADERS FROM 'file:///Episode.csv' AS row
+MERGE (e:Episode {episode_id: row.episode_id})
+SET e.season = toInteger(row.season),
+    e.episode = toInteger(row.episode),
+    e.number_in_series = toInteger(row.number_in_series),
+    e.title = row.title,
+    e.summary = row.summary,
+    e.air_date = date(row.air_date),
+    e.episode_image = row.episode_image,
+    e.rating = toFloat(row.rating),
+    e.votes = toInteger(row.votes);
+
+LOAD CSV WITH HEADERS FROM 'file:///Keyword.csv' AS row
+MATCH (e:Episode {episode_id: row.episode_id})
+MERGE (k:Keyword {name: row.keyword})
+MERGE (e)-[:HAS_KEYWORD]->(k);
+
+LOAD CSV WITH HEADERS FROM 'file:///Credit.csv' AS row
+MATCH (e:Episode {episode_id: row.episode_id})
+MERGE (p:Person {name: row.person})
+MERGE (c:Credit {category: row.category, role: row.role})
+WITH e, p, c, row
+WHERE row.credited = 'true'
+MERGE (p)-[r:CONTRIBUTED]->(c)
+ON CREATE SET r.role = row.role;
+
+LOAD CSV WITH HEADERS FROM 'file:///Character_Award.csv' AS row
+MATCH (a:Award {award_id: toInteger(row.award_id)})
+MERGE (c:Character {name: row.character})
+MERGE (c)-[:WON_AWARD]->(a);
+
+LOAD CSV WITH HEADERS FROM 'file:///Award.csv' AS row
+MATCH (episode:Episode {episode_id: row.episode_id})
+MERGE (person:Person {name: coalesce(row.person, 'Unknown')})
+MERGE (award:Award {name: row.award})
+MERGE (person)-[:RECEIVED_AWARD {role: coalesce(row.role, 'Unknown'), result: row.result}]->(award);
+
+LOAD CSV WITH HEADERS FROM 'file:///Vote.csv' AS row
+MATCH (e:Episode {episode_id: row.episode_id})
+MERGE (v:Vote {stars: toInteger(row.stars)})
+SET v.votes = toInteger(row.votes),
+    v.percent = toFloat(row.percent)
+MERGE (e)-[:RECEIVED_VOTE]->(v);
